@@ -1,1 +1,1 @@
-a simple in memory row oriented db 
+a simple in-memory db

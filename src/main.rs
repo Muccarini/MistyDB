@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::{Write, stdin, stdout};
 use std::process::exit;
 
+mod intepreter;
+
 #[derive(Parser)]
 #[command(name = "misty-db")]
 struct CliArgs{
