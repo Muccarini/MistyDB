@@ -1,4 +1,3 @@
-use anyhow::{Result, Error};
 use clap::{Parser};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::{Write, stdin, stdout};
@@ -36,7 +35,7 @@ fn main() {
             None => exit(-1)
         }
     } else {
-        print!("-- Running in in-memory mode.\n");
+        print!("Running in in-memory mode.\n");
     }
 
     loop {
@@ -51,8 +50,7 @@ fn main() {
 
         input = input.trim().to_string();
 
-        if input == "exit" || input == "quit"{
-            println!("Goodbye!");
+        if input == "exit" || input == "quit" || input == "q"{
             break;
         }
 
