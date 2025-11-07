@@ -5,6 +5,8 @@ use std::process::exit;
 
 mod interpreter;
 
+use interpreter::Interpreter;
+
 #[derive(Parser)]
 #[command(name = "misty-db")]
 struct CliArgs{
@@ -24,9 +26,7 @@ impl Display for CliArgs{
     }
 }
 
-
 fn main() {
-
     let args = CliArgs::parse();
 
     print!("-- Welcome to MistyDB --\n");
@@ -56,7 +56,9 @@ fn main() {
             break;
         }
 
-        println!("Processing input...")
+        println!("Processing input...");
+
+        Interpreter::execute_full_pipeline(input);
     }
 
 }

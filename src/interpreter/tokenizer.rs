@@ -255,7 +255,7 @@ impl Tokenizer{
                         j += 1;
                     }
 
-                    let num_str = str::from_utf8(&bytes[i..j])
+                    let num_str = std::str::from_utf8(&bytes[i..j])
                         .map_err(|_| anyhow!("Invalid UTF-8 in number literal"))?;
 
                     let num = num_str.parse::<f64>()
@@ -271,7 +271,7 @@ impl Tokenizer{
                     let mut j = i + 1;
 
                     while j < bytes.len(){
-                        if (bytes[j] == b'"'){
+                        if bytes[j] == b'"' {
                             let mut num_backslashes = 0;
                             let mut k = j - 1;
                             
