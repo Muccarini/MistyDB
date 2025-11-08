@@ -1,64 +1,69 @@
-use clap::{Parser};
+use clap::Parser;
 use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::io::{Write, stdin, stdout};
+use std::io::{stdin, stdout, Write};
 use std::process::exit;
-
-mod interpreter;
-
-use interpreter::Interpreter;
 
 #[derive(Parser)]
 #[command(name = "misty-db")]
-struct CliArgs{
-    command: String,
-
+#[command(about = "MistyDB - A simple database system", long_about = None)]
+struct CliArgs {
     #[arg(short, long)]
     persistent: bool,
 
     #[arg(short, long, required_if_eq("persistent", "true"))]
-    mount: Option<String>, 
+    mount: Option<String>,
 }
 
-impl Display for CliArgs{
+impl Display for CliArgs {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Command: {}, Persistent: {:?}, Mount: {:?}",
-        self.command, self.persistent, self.mount)
+        write!(
+            f,
+            "Persistent: {:?}, Mount: {:?}",
+            self.persistent, self.mount
+        )
     }
 }
 
 fn main() {
     let args = CliArgs::parse();
 
-    print!("-- Welcome to MistyDB --\n");
+    println!("-- Welcome to MistyDB --");
 
     if args.persistent {
         match &args.mount {
-            Some(path) => print!("-- Mounting database at path: {}\n", path),
-            None => exit(-1)
+            Some(path) => println!("-- Mounting database at path: {}", path),
+            None => exit(-1),
         }
     } else {
-        print!("Running in in-memory mode.\n");
+        println!("Running in in-memory mode.");
     }
 
+    println!("Type 'exit', 'quit', or 'q' to exit.");
+    println!();
+
     loop {
-        print!("> ");
+        print!("misty> ");
         stdout().flush().unwrap();
 
         let mut input = String::new();
 
         stdin()
-        .read_line(&mut input)
-        .expect("Failed to read the line");
+            .read_line(&mut input)
+            .expect("Failed to read the line");
 
-        input = input.trim().to_string();
+        let input = input.trim().to_string();
 
-        if input == "exit" || input == "quit" || input == "q"{
+        if input == "exit" || input == "quit" || input == "q" {
+            println!("Goodbye!");
             break;
         }
 
-        println!("Processing input...");
+        if input.is_empty() {
+            continue;
+        }
 
-        Interpreter::execute_full_pipeline(input);
+        println!("Processing: {}", input);
+        // TODO: Add actual database command processing here
+        // For now, this is just a placeholder REPL
     }
-
 }

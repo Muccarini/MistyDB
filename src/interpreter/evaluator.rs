@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
-use crate::interpreter::ast::{AST, Statement, Expr, BinaryOp};
+use crate::interpreter::ast::{AST, Statement, Expr, BinaryOp, UnaryOp};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -56,6 +56,12 @@ impl Evaluator {
                 println!("{}", value);
                 Ok(value)
             }
+            Statement::Let { name, value } => {
+                let eval_value = self.eval_expr(value)?;
+                self.variables.insert(name.clone(), eval_value.clone());
+                println!("Let {} = {}", name, eval_value);
+                Ok(eval_value)
+            }
             Statement::Get { .. } => {
                 println!("GET statement (not yet implemented)");
                 Ok(Value::Unit)
@@ -91,6 +97,10 @@ impl Evaluator {
                 let left_val = self.eval_expr(left)?;
                 let right_val = self.eval_expr(right)?;
                 self.eval_binary_op(&left_val, op, &right_val)
+            }
+            Expr::Unary { op, operand } => {
+                let operand_val = self.eval_expr(operand)?;
+                self.eval_unary_op(op, &operand_val)
             }
             Expr::Call { name, args } => {
                 // Look up function
@@ -141,6 +151,18 @@ impl Evaluator {
         }
     }
 
+    fn eval_unary_op(&self, op: &UnaryOp, operand: &Value) -> Result<Value> {
+        match (op, operand) {
+            (UnaryOp::Neg, Value::Number(n)) => Ok(Value::Number(-n)),
+            (UnaryOp::Not, Value::Boolean(b)) => Ok(Value::Boolean(!b)),
+            _ => Err(anyhow!(
+                "Invalid unary operation: {:?} {:?}",
+                op,
+                operand
+            )),
+        }
+    }
+
     fn eval_binary_op(&self, left: &Value, op: &BinaryOp, right: &Value) -> Result<Value> {
         match (left, op, right) {
             (Value::Number(l), BinaryOp::Add, Value::Number(r)) => Ok(Value::Number(l + r)),
@@ -166,6 +188,8 @@ impl Evaluator {
             }
             
             // Boolean operations
+            (Value::Boolean(l), BinaryOp::And, Value::Boolean(r)) => Ok(Value::Boolean(*l && *r)),
+            (Value::Boolean(l), BinaryOp::Or, Value::Boolean(r)) => Ok(Value::Boolean(*l || *r)),
             (Value::Boolean(l), BinaryOp::Eq, Value::Boolean(r)) => Ok(Value::Boolean(l == r)),
             (Value::Boolean(l), BinaryOp::Neq, Value::Boolean(r)) => Ok(Value::Boolean(l != r)),
             

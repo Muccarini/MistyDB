@@ -1,7 +1,7 @@
-mod tokenizer;
-mod parser;
-mod evaluator;
-mod ast;
+pub mod tokenizer;
+pub mod parser;
+pub mod evaluator;
+pub mod ast;
 
 use anyhow::{Error, Result, anyhow};
 use tokenizer::Tokenizer;
@@ -16,20 +16,20 @@ impl Interpreter{
     // source -> tokenization -> parsing -> evaluation
     pub fn execute_full_pipeline(source: String) -> Result<(), Error>{
         let tokens = Tokenizer::tokenize(source)
-            .map_err(|_| anyhow!("Failed to tokenize input"))?;
+            .map_err(|e| anyhow!("Failed to tokenize input: {}", e))?;
 
-        println!("Tokens: {:?}", tokens);
+        //println!("Tokens: {:?}", tokens);
 
         let parser = Parser::new(tokens);
 
         let ast = parser.parse()
-            .map_err(|_| anyhow!("Failed to parse tokens"))?;
+            .map_err(|e| anyhow!("Failed to parse tokens: {}", e))?;
 
-        println!("AST: {:?}", ast);
+        println!("AST: {:#?}", ast);
 
         let evaluator = Evaluator::new();
         evaluator.evaluate(ast)
-            .map_err(|_| anyhow!("Failed to evaluate AST"))?;
+            .map_err(|e| anyhow!("Failed to evaluate AST: {}", e))?;
 
         println!("Execution completed successfully.");
 

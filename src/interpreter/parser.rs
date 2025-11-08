@@ -1,12 +1,9 @@
-use std::ffi::FromVecWithNulError;
-use std::ops::Index;
-use std::thread::current;
 use std::mem::take;
 
 use anyhow::{Result, anyhow};
 
 use crate::interpreter::tokenizer::{Token, TokenKind};
-use crate::interpreter::ast::{AST, Statement, Expr, BinaryOp};
+use crate::interpreter::ast::{AST, Statement, Expr, BinaryOp, UnaryOp};
 
 pub struct Parser{
     tokens: Vec<Token>,
@@ -19,6 +16,15 @@ impl Parser {
         Parser {
             tokens,
             current: 0,
+        }
+    }
+
+    // Helper method to create error messages with position information
+    fn error_at(&self, pos: usize, message: &str) -> anyhow::Error {
+        if pos < self.tokens.len() {
+            anyhow!("{} at line {}, column {}", message, self.tokens[pos].line, self.tokens[pos].col)
+        } else {
+            anyhow!("{} at end of file", message)
         }
     }
 
@@ -43,12 +49,134 @@ impl Parser {
         Ok(AST { statements })
     }
 
-    // Parse an expression and return (Expr, next_position)
+    // Parse an expression
+    // lowest precedence -> highest precedence
+    // from primitive to logical_or
+    // logical_or <- logical_and <- comparison <- sum <- mult <- primitive (func calls | identifiers | numbers ...)
     pub fn parse_expression(&mut self, start: usize) -> Result<(Expr, usize)> {
-        self.parse_additive(start)
+        self.parse_logical_or(start)
     }
 
-    // Parse + and - (lowest precedence)
+    // Parse logical OR (lowest precedence)
+    fn parse_logical_or(&mut self, start: usize) -> Result<(Expr, usize)> {
+        let (mut left, mut pos) = self.parse_logical_and(start)?;
+
+        while pos < self.tokens.len() {
+            match &self.tokens[pos].kind {
+                TokenKind::Or => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_logical_and(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::Or,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                _ => break,
+            }
+        }
+
+        Ok((left, pos))
+    }
+
+    // Parse logical AND (higher precedence than OR)
+    fn parse_logical_and(&mut self, start: usize) -> Result<(Expr, usize)> {
+        let (mut left, mut pos) = self.parse_comparison(start)?;
+
+        while pos < self.tokens.len() {
+            match &self.tokens[pos].kind {
+                TokenKind::And => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_comparison(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::And,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                _ => break,
+            }
+        }
+
+        Ok((left, pos))
+    }
+
+    // Parse comparison operators (higher precedence than logical operators)
+    fn parse_comparison(&mut self, start: usize) -> Result<(Expr, usize)> {
+        let (mut left, mut pos) = self.parse_additive(start)?;
+
+        while pos < self.tokens.len() {
+            match &self.tokens[pos].kind {
+                TokenKind::Eq => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_additive(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::Eq,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                TokenKind::Neq => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_additive(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::Neq,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                TokenKind::Gt => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_additive(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::Gt,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                TokenKind::Lt => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_additive(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::Lt,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                TokenKind::Gte => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_additive(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::Gte,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                TokenKind::Lte => {
+                    pos += 1;
+                    let (right, next_pos) = self.parse_additive(pos)?;
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: BinaryOp::Lte,
+                        right: Box::new(right),
+                    };
+                    pos = next_pos;
+                }
+                _ => break,
+            }
+        }
+
+        Ok((left, pos))
+    }
+
+    // Parse + and -
     fn parse_additive(&mut self, start: usize) -> Result<(Expr, usize)> {
         let (mut left, mut pos) = self.parse_multiplicative(start)?;
 
@@ -83,13 +211,13 @@ impl Parser {
 
     // Parse multiplication and division (higher precedence)
     fn parse_multiplicative(&mut self, start: usize) -> Result<(Expr, usize)> {
-        let (mut left, mut pos) = self.parse_primary(start)?;
+        let (mut left, mut pos) = self.parse_unary(start)?;
 
         while pos < self.tokens.len() {
             match &self.tokens[pos].kind {
                 TokenKind::Multiply => {
                     pos += 1;
-                    let (right, next_pos) = self.parse_primary(pos)?;
+                    let (right, next_pos) = self.parse_unary(pos)?;
                     left = Expr::Binary {
                         left: Box::new(left),
                         op: BinaryOp::Mul,
@@ -99,7 +227,7 @@ impl Parser {
                 }
                 TokenKind::Divide => {
                     pos += 1;
-                    let (right, next_pos) = self.parse_primary(pos)?;
+                    let (right, next_pos) = self.parse_unary(pos)?;
                     left = Expr::Binary {
                         left: Box::new(left),
                         op: BinaryOp::Div,
@@ -114,10 +242,28 @@ impl Parser {
         Ok((left, pos))
     }
 
-    // Parse primary expressions
-    fn parse_primary(&mut self, start: usize) -> Result<(Expr, usize)> {
+    // Parse unary operators (higher precedence than multiplication)
+    fn parse_unary(&mut self, start: usize) -> Result<(Expr, usize)> {
         if start >= self.tokens.len() {
-            return Err(anyhow!("Unexpected end of input"));
+            return Err(self.error_at(start.saturating_sub(1), "Unexpected end of input"));
+        }
+
+        match &self.tokens[start].kind {
+            TokenKind::Minus => {
+                let (operand, pos) = self.parse_unary(start + 1)?;
+                Ok((Expr::Unary {
+                    op: UnaryOp::Neg,
+                    operand: Box::new(operand),
+                }, pos))
+            }
+            _ => self.parse_primitive_expr(start),
+        }
+    }
+
+    // Parse primary expressions
+    fn parse_primitive_expr(&mut self, start: usize) -> Result<(Expr, usize)> {
+        if start >= self.tokens.len() {
+            return Err(self.error_at(start.saturating_sub(1), "Unexpected end of input"));
         }
 
         match &mut self.tokens[start].kind {
@@ -184,69 +330,20 @@ impl Parser {
                 let (expr, pos) = self.parse_expression(start + 1)?;
                 
                 if pos >= self.tokens.len() {
-                    return Err(anyhow!("Expected closing parenthesis, found end of input"));
+                    return Err(self.error_at(pos.saturating_sub(1), "Expected closing parenthesis, found end of input"));
                 }
                 
                 match &self.tokens[pos].kind {
                     TokenKind::RParen => Ok((expr, pos + 1)),
-                    _ => Err(anyhow!("Expected closing parenthesis, found {:?}", self.tokens[pos].kind))
+                    _ => Err(self.error_at(pos, &format!("Expected closing parenthesis, found {:?}", self.tokens[pos].kind)))
                 }
             }
-            _ => Err(anyhow!("Expected expression, found {:?}", self.tokens[start].kind))
+            _ => Err(self.error_at(start, &format!("Expected expression, found {:?}", self.tokens[start].kind)))
         }
-    }
-
-    fn binary_op_parse(&self, start: usize) -> Result<Statement> {
-        // Placeholder implementation
-        Err(anyhow::anyhow!("Not implemented"))
-    }
-
-    fn expr_parse(&self, start: usize) -> Result<Statement> {
-        // Placeholder implementation
-        Err(anyhow::anyhow!("Not implemented"))
-    }
-
-    fn statement_parse(&self, start: usize) -> Result<Statement> {
-        // Placeholder implementation
-        Err(anyhow::anyhow!("Not implemented"))
     }
 
     // parse get statement, to a given start, it must correspond to a get token.
     fn get_parse(&self, start: usize) -> Result<Statement> {
- 
-        if start >= self.tokens.len() {
-            return Err(anyhow::anyhow!("Start index out of bounds"));
-        }
-
-        if(self.tokens[start].kind != TokenKind::Get){
-            return Err(anyhow::anyhow!("Expected 'get' token"));
-        }
-
-        let mut pos = start + 1;
-
-        let mut field_name = String::new();
-        //let mut filter = None;
-
-        while pos < self.tokens.len() {
-            match &self.tokens[pos].kind {
-                TokenKind::Identifier(name) => {
-                    let table_name = name;
-                    pos += 1;
-                },
-                TokenKind::Number(value) => {
-                    // Handle number
-                },
-                TokenKind::Dot => {
-                    // Handle dot
-                },
-                TokenKind::Semicolon => {
-                    // End of statement
-                },
-                _ => {
-                    pos += 1;
-                }
-            }
-        }
 
         Err(anyhow!("Not implemented"))
     }
@@ -256,14 +353,73 @@ impl Parser {
         Err(anyhow::anyhow!("Not implemented"))
     }
 
-    fn where_parse(&self, start: usize) -> Result<Statement> {
-        // Placeholder implementation
-        Err(anyhow::anyhow!("Not implemented"))
+    // Parse where statement: where <condition>;
+    fn where_parse(&mut self, start: usize) -> Result<(Statement, usize)> {
+        if start >= self.tokens.len() {
+            return Err(anyhow!("Start index out of bounds"));
+        }
+
+        if self.tokens[start].kind != TokenKind::Where {
+            return Err(anyhow!("Expected 'where' token"));
+        }
+
+        let mut pos = start + 1;
+
+        // Parse the condition expression
+        let (condition, next_pos) = self.parse_expression(pos)?;
+        pos = next_pos;
+
+        // Optionally consume semicolon
+        if pos < self.tokens.len() && self.tokens[pos].kind == TokenKind::Semicolon {
+            pos += 1;
+        }
+
+        Ok((Statement::Where { condition }, pos))
     }
 
     fn delete_parse(&self, start: usize) -> Result<Statement> {
         // Placeholder implementation
         Err(anyhow::anyhow!("Not implemented"))
+    }
+
+    // Parse let statement: let <identifier> = <expr>;
+    fn let_parse(&mut self, start: usize) -> Result<(Statement, usize)> {
+        if start >= self.tokens.len() {
+            return Err(self.error_at(start.saturating_sub(1), "Start index out of bounds"));
+        }
+
+        if self.tokens[start].kind != TokenKind::Let {
+            return Err(self.error_at(start, "Expected 'let' token"));
+        }
+
+        let mut pos = start + 1;
+
+        // Parse variable name
+        let name = match &mut self.tokens[pos].kind {
+            TokenKind::Identifier(n) => {
+                let name = take(n);
+                pos += 1;
+                name
+            }
+            _ => return Err(self.error_at(pos, &format!("Expected identifier after 'let', found {:?}", self.tokens[pos].kind))),
+        };
+
+        // Expect '='
+        if pos >= self.tokens.len() || self.tokens[pos].kind != TokenKind::Assign {
+            return Err(self.error_at(pos, &format!("Expected '=' after variable name, found {:?}", self.tokens.get(pos).map(|t| &t.kind))));
+        }
+        pos += 1;
+
+        // Parse the value expression
+        let (value, next_pos) = self.parse_expression(pos)?;
+        pos = next_pos;
+
+        // Optionally consume semicolon
+        if pos < self.tokens.len() && self.tokens[pos].kind == TokenKind::Semicolon {
+            pos += 1;
+        }
+
+        Ok((Statement::Let { name, value }, pos))
     }
 
     // Parse a single statement at the given position
@@ -290,12 +446,10 @@ impl Parser {
                 Ok((stmt, pos + 1))
             }
             TokenKind::Where => {
-                let stmt = self.where_parse(pos)?;
-                Ok((stmt, pos + 1))
+                self.where_parse(pos)
             }
             TokenKind::Let => {
-                // TODO: Implement let parsing
-                Err(anyhow!("Let statements not yet implemented"))
+                self.let_parse(pos)
             }
             _ => {
                 // Parse as expression statement
@@ -315,11 +469,11 @@ impl Parser {
     // Parse function definition: func name(param1, param2) { ... }
     fn func_parse(&mut self, start: usize) -> Result<(Statement, usize)> {
         if start >= self.tokens.len() {
-            return Err(anyhow!("Start index out of bounds"));
+            return Err(self.error_at(start.saturating_sub(1), "Start index out of bounds"));
         }
 
         if self.tokens[start].kind != TokenKind::Func {
-            return Err(anyhow!("Expected 'func' token"));
+            return Err(self.error_at(start, "Expected 'func' token"));
         }
 
         let mut pos = start + 1;
@@ -331,12 +485,12 @@ impl Parser {
                 pos += 1;
                 name
             }
-            _ => return Err(anyhow!("Expected function name after 'func', found {:?}", self.tokens[pos].kind)),
+            _ => return Err(self.error_at(pos, &format!("Expected function name after 'func', found {:?}", self.tokens[pos].kind))),
         };
 
         // Expect '('
         if pos >= self.tokens.len() || self.tokens[pos].kind != TokenKind::LParen {
-            return Err(anyhow!("Expected '(' after function name, found {:?}", self.tokens.get(pos).map(|t| &t.kind)));
+            return Err(self.error_at(pos, &format!("Expected '(' after function name, found {:?}", self.tokens.get(pos).map(|t| &t.kind))));
         }
         pos += 1;
 
@@ -345,7 +499,7 @@ impl Parser {
         
         // Check if there are any parameters
         if pos < self.tokens.len() && self.tokens[pos].kind != TokenKind::RParen {
-            while pos < self.tokens.len() {
+            loop {
                 match &self.tokens[pos].kind {
                     TokenKind::Identifier(param_name) => {
                         params.push(param_name.clone());
@@ -370,8 +524,6 @@ impl Parser {
                     _ => return Err(anyhow!("Expected ',' or ')' in parameter list, found {:?}", self.tokens[pos].kind)),
                 }
             }
-
-            return Err(anyhow!("Unexpected end of input in parameter list"));
         }
 
         // Expect ')'

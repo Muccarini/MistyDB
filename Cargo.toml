@@ -3,6 +3,24 @@ name = "misty-db"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "misty_db"
+path = "src/lib.rs"
+
 [dependencies]
 clap = { version = "4.5.51", features = [ "derive" ] }
 anyhow = "1.0.100"
+
+# MistyDB database binary
+[[bin]]
+name = "misty-db"
+path = "src/main.rs"
+
+# Mu interpreter CLI binary
+[[bin]]
+name = "mu"
+path = "src/bin/mu.rs"
+
+[[bin]]
+name = "test_parser_complete"
+path = "test_parser_complete.rs"

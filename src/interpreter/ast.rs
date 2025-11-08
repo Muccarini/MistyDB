@@ -11,6 +11,10 @@ pub enum Expr {
         op: BinaryOp,
         right: Box<Expr>,
     },
+    Unary {
+        op: UnaryOp,
+        operand: Box<Expr>,
+    },
     Number(f64),
     String(String),
     Boolean(bool),
@@ -27,9 +31,16 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone)]
+pub enum UnaryOp {
+    Neg,
+    Not,
+}
+
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add, Sub, Mul, Div,
     Eq, Neq, Gt, Lt, Gte, Lte,
+    And, Or,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +49,7 @@ pub enum Statement {
     Set { field: Expr, key: String, value: Expr },
     Delete { field: Expr, key: String },
     Where { condition: Expr },
+    Let { name: String, value: Expr },
     FuncDef {
         name: String,
         params: Vec<String>,

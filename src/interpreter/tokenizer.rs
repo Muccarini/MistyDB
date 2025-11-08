@@ -4,8 +4,8 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 #[derive(Debug)]
 pub struct Token{
     pub kind: TokenKind,
-    line: usize,
-    col: usize
+    pub line: usize,
+    pub col: usize
 }
 
 impl Display for Token {
@@ -51,6 +51,10 @@ pub enum TokenKind{
     Lt,
     Gte,
     Lte,
+
+    //logic
+    And,
+    Or,
 
     //generic
     Expr,
@@ -98,6 +102,24 @@ impl Tokenizer{
                 '\t' => {
                     col += 4; // visual alignment
                     i += 1;   // still skip one 1 byte
+                },
+                '&' => {
+                    if i + 1 < bytes.len() && bytes[i + 1] == b'&' {
+                        tokens.push(Token { kind: TokenKind::And, line: row, col: col });
+                        col += 2;
+                        i += 2;
+                    } else {
+                        return Err(anyhow!("Expected char '&'"));
+                    }
+                },
+                '|' => {
+                    if i + 1 < bytes.len() && bytes[i + 1] == b'|' {
+                        tokens.push(Token { kind: TokenKind::Or, line: row, col: col });
+                        col += 2;
+                        i += 2;
+                    } else {
+                        return Err(anyhow!("Expected char '|'"));
+                    }
                 },
                 '.' => {
                     tokens.push(Token { kind: TokenKind::Dot, line: row, col: col });
