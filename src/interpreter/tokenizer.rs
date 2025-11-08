@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 
 #[derive(Debug)]
 pub struct Token{
-    kind: TokenKind,
+    pub kind: TokenKind,
     line: usize,
     col: usize
 }
@@ -14,12 +14,15 @@ impl Display for Token {
     }
 }
 
-#[derive(Debug)]
-enum TokenKind{
+#[derive(Debug, PartialEq)]
+pub enum TokenKind{
     //keywords
+    Let,
+    Func,
     Get,
     Set,
     Where,
+    Delete,
     True,
     False,
 
@@ -55,7 +58,6 @@ enum TokenKind{
     Number(f64),
     String(String),
     Boolean(bool),
-    Func,
     EOF,
 }
 
@@ -317,9 +319,12 @@ impl Tokenizer{
 
                     // Check if it's a keyword
                     let token = match word.to_ascii_lowercase().as_slice() {
+                        b"let" => Token { kind: TokenKind::Let, line: row, col: col },
+                        b"func" => Token { kind: TokenKind::Func, line: row, col: col },
                         b"get" => Token { kind: TokenKind::Get, line: row, col: col },
                         b"set" => Token { kind: TokenKind::Set, line: row, col: col },
                         b"where" => Token { kind: TokenKind::Where, line: row, col: col },
+                        b"delete" => Token { kind: TokenKind::Delete, line: row, col: col },
                         b"true" => Token { kind: TokenKind::Boolean(true), line: row, col: col },
                         b"false" => Token { kind: TokenKind::Boolean(false), line: row, col: col },
                         _ => {

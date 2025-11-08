@@ -20,15 +20,16 @@ impl Interpreter{
 
         println!("Tokens: {:?}", tokens);
 
-        let ast = Parser::parse(tokens)
+        let parser = Parser::new(tokens);
+
+        let ast = parser.parse()
             .map_err(|_| anyhow!("Failed to parse tokens"))?;
 
         println!("AST: {:?}", ast);
 
-        let result = Evaluator::evaluate(ast)
+        let evaluator = Evaluator::new();
+        evaluator.evaluate(ast)
             .map_err(|_| anyhow!("Failed to evaluate AST"))?;
-
-        println!("Evaluation Result: {:?}", result);
 
         println!("Execution completed successfully.");
 

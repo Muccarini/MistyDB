@@ -1,10 +1,10 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AST {
     pub statements: Vec<Statement>
 }
 
 //expr returns a value
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -24,24 +24,24 @@ pub enum Expr {
         name: String,
         args: Vec<Expr>
     },
-    //also func def return an expr
-    Func{
-        name: String,
-        params: Vec<String>,
-        body: Vec<Statement>,
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add, Sub, Mul, Div,
     Eq, Neq, Gt, Lt, Gte, Lte,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
-    Get { table: String, filter: Option<Expr> },
-    Set { table: String, key: String, value: Expr },
-    Delete { table: String, key: String },
+    Get { field: Expr, filter: Option<Expr> },
+    Set { field: Expr, key: String, value: Expr },
+    Delete { field: Expr, key: String },
     Where { condition: Expr },
+    FuncDef {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Statement>,
+    },
+    Expr(Expr),
 }
