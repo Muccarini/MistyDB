@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::interpreter::parser::{AST};
+use crate::interpreter::ast::{AST};
 
 pub struct Evaluator{
 

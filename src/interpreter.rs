@@ -1,6 +1,7 @@
 mod tokenizer;
 mod parser;
 mod evaluator;
+mod ast;
 
 use anyhow::{Error, Result, anyhow};
 use tokenizer::Tokenizer;
