@@ -34,12 +34,3 @@ func greet(name) {
 
 let msg = greet("World");
 ```
-
-### Example
-```mu
-func calculate_area(width, height) {
-    width * height;
-}
-
-let result = calculate_area(10, 20);
-```
